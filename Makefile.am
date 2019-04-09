@@ -1,6 +1,6 @@
 ACLOCAL_AMFLAGS=-I m4
 
-EXTRA_DIST = autogen.sh ChangeLog README.md LICENSE DISCLAIMER
+EXTRA_DIST = autogen.sh ChangeLog README.md LICENSE
 
 AM_CPPFLAGS = -Wall -Werror
 AM_CPPFLAGS += -fPIC -pipe  -O -Wall -Wextra -Wpointer-arith -Wno-unused-parameter -Wno-deprecated-declarations
