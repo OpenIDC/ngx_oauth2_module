@@ -20,3 +20,4 @@
 /ngx_oauth2_module.la
 /nginx.conf
 /.autotools
+/.settings
