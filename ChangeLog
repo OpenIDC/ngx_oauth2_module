@@ -1,0 +1,3 @@
+07/04/2019
+- depend on liboauth2 1.1.1 with log encapsulation changes
+- bump to 3.0.2

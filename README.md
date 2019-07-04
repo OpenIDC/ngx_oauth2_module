@@ -17,7 +17,7 @@ OAuth2TokenVerify [ introspect | jwk_uri | metadata | jwk | plain | base64 | bas
     #
     map $http_authorization $source_token {
         default "";
-        "~bearer (?<token>.*)$" $token;
+        "~*^Bearer\s+(?<token>[\S]+)$" $token;
     }
 
     server {
