@@ -60,6 +60,13 @@ static void *ngx_oauth2_create_loc_conf(ngx_conf_t *cf)
 
 	cfg = ngx_pnalloc(cf->pool, sizeof(ngx_oauth2_cfg_t));
 	cfg->cf = cf;
+	cfg->claims = NULL;
+	cfg->verify = NULL;
+	cfg->source_token.flushes = NULL;
+	cfg->source_token.lengths = NULL;
+	cfg->source_token.value.data = NULL;
+	cfg->source_token.value.len = 0;
+	cfg->source_token.values = NULL;
 
 	// TODO: correct level
 	// oauth2_log_t *log = oauth2_log_init(OAUTH2_LOG_TRACE1, NULL);
@@ -334,6 +341,9 @@ static ngx_int_t ngx_oauth2_handler(ngx_http_request_t *r)
 	ngx_str_t ngx_source_token;
 	char *source_token = NULL;
 	json_t *json_payload = NULL;
+
+	ngx_source_token.data = NULL;
+	ngx_source_token.len = 0;
 
 	if (r != r->main)
 		goto end;
