@@ -391,7 +391,7 @@ static ngx_int_t ngx_oauth2_handler(ngx_http_request_t *r)
 	oauth2_debug(ctx->log, "enter: source_token=%s, initial_request=%d",
 		     source_token, (r != r->main));
 
-	if (oauth2_token_verify(ctx->log, cfg->verify, source_token,
+	if (oauth2_token_verify(ctx->log, ctx->request, cfg->verify, source_token,
 				&json_payload) == false) {
 		oauth2_warn(ctx->log, "Token could not be verified.");
 		// TODO: return HTTP 401 unauthorized
