@@ -44,6 +44,9 @@ typedef struct ngx_oauth2_cfg_t {
 	oauth2_cfg_token_verify_t *verify;
 	ngx_conf_t *cf;
 	ngx_oauth_claim_t *claims;
+	// TODO: dummy to satisfy the NGINX macro... (passed as "log" parameter
+	// to oauth2_cfg_set_cache)
+	void *cfg;
 } ngx_oauth2_cfg_t;
 
 static void ngx_oauth2_cleanup(void *data)
@@ -204,20 +207,28 @@ oauth2_mem_free(v2);
 oauth2_mem_free(v1);
 OAUTH2_NGINX_CFG_FUNC_END(cf, rv)
 
+OAUTH2_NGINX_CFG_FUNC_ARGS2(ngx_oauth2_cfg_t, dummy, oauth2_cfg, cache)
+
 #define NGINX_OAUTH2_CMD_TAKE(nargs, primitive, member)                        \
 	OAUTH2_NGINX_CMD_TAKE##nargs(oauth2_cfg, primitive, member)
 
+#define OAuth2TokenVerify "OAuth2TokenVerify"
+#define OAuth2Claim "OAuth2Claim"
+#define OAuth2Cache "OAuth2Cache"
+
 // clang-format off
 static ngx_command_t ngx_oauth2_commands[] = {
-	NGINX_OAUTH2_CMD_TAKE(34, "OAuth2TokenVerify", token_verify),
+	NGINX_OAUTH2_CMD_TAKE(12, OAuth2Cache, cache),
+	NGINX_OAUTH2_CMD_TAKE(34, OAuth2TokenVerify, token_verify),
 	{
-		ngx_string("OAuth2Claim"),
+		ngx_string(OAuth2Claim),
 		NGX_HTTP_LOC_CONF | NGX_CONF_TAKE2,
 		ngx_oauth2_claim_command,
 		NGX_HTTP_LOC_CONF_OFFSET,
 		0,
 		NULL
 	},
+
 	ngx_null_command
 };
 
@@ -391,8 +402,8 @@ static ngx_int_t ngx_oauth2_handler(ngx_http_request_t *r)
 	oauth2_debug(ctx->log, "enter: source_token=%s, initial_request=%d",
 		     source_token, (r != r->main));
 
-	if (oauth2_token_verify(ctx->log, ctx->request, cfg->verify, source_token,
-				&json_payload) == false) {
+	if (oauth2_token_verify(ctx->log, ctx->request, cfg->verify,
+				source_token, &json_payload) == false) {
 		oauth2_warn(ctx->log, "Token could not be verified.");
 		// TODO: return HTTP 401 unauthorized
 		rv = NGX_ERROR;
