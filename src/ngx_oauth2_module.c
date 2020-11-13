@@ -207,21 +207,25 @@ oauth2_mem_free(v2);
 oauth2_mem_free(v1);
 OAUTH2_NGINX_CFG_FUNC_END(cf, rv)
 
+static const char *oauth2_cfg_set_passphrase(void *dummy,
+					      const char *passphrase)
+{
+	return oauth2_crypto_passphrase_set(NULL, passphrase);
+}
+
 OAUTH2_NGINX_CFG_FUNC_ARGS2(ngx_oauth2_cfg_t, dummy, oauth2_cfg, cache)
+OAUTH2_NGINX_CFG_FUNC_ARGS1(ngx_oauth2_cfg_t, dummy, oauth2_cfg, passphrase)
 
 #define NGINX_OAUTH2_CMD_TAKE(nargs, primitive, member)                        \
 	OAUTH2_NGINX_CMD_TAKE##nargs(oauth2_cfg, primitive, member)
 
-#define OAuth2TokenVerify "OAuth2TokenVerify"
-#define OAuth2Claim "OAuth2Claim"
-#define OAuth2Cache "OAuth2Cache"
-
 // clang-format off
 static ngx_command_t ngx_oauth2_commands[] = {
-	NGINX_OAUTH2_CMD_TAKE(12, OAuth2Cache, cache),
-	NGINX_OAUTH2_CMD_TAKE(34, OAuth2TokenVerify, token_verify),
+	NGINX_OAUTH2_CMD_TAKE(1, "OAuth2CryptoPassphrase", passphrase),
+	NGINX_OAUTH2_CMD_TAKE(12, "OAuth2Cache", cache),
+	NGINX_OAUTH2_CMD_TAKE(34, "OAuth2TokenVerify", token_verify),
 	{
-		ngx_string(OAuth2Claim),
+		ngx_string("OAuth2Claim"),
 		NGX_HTTP_LOC_CONF | NGX_CONF_TAKE2,
 		ngx_oauth2_claim_command,
 		NGX_HTTP_LOC_CONF_OFFSET,
