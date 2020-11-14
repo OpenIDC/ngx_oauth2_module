@@ -44,9 +44,8 @@ typedef struct ngx_oauth2_cfg_t {
 	oauth2_cfg_token_verify_t *verify;
 	ngx_conf_t *cf;
 	ngx_oauth_claim_t *claims;
-	// TODO: dummy to satisfy the NGINX macro... (passed as "log" parameter
-	// to oauth2_cfg_set_cache)
-	void *cfg;
+	// TODO:
+	oauth2_log_t *log;
 } ngx_oauth2_cfg_t;
 
 static void ngx_oauth2_cleanup(void *data)
@@ -62,6 +61,7 @@ static void *ngx_oauth2_create_loc_conf(ngx_conf_t *cf)
 	ngx_pool_cleanup_t *cln = NULL;
 
 	cfg = ngx_pnalloc(cf->pool, sizeof(ngx_oauth2_cfg_t));
+	cfg->log = NULL;
 	cfg->cf = cf;
 	cfg->claims = NULL;
 	cfg->verify = NULL;
@@ -128,8 +128,8 @@ static ngx_int_t ngx_oauth2_claim_variable(ngx_http_request_t *r,
 	return NGX_OK;
 }
 
-static char *ngx_oauth2_claim_command(ngx_conf_t *cf, ngx_command_t *cmd,
-				      void *conf)
+static char *ngx_oauth2_set_claim(ngx_conf_t *cf, ngx_command_t *cmd,
+				  void *conf)
 {
 	char *rv = NGX_CONF_ERROR;
 	// ngx_http_core_loc_conf_t *clcf = NULL;
@@ -180,7 +180,7 @@ end:
 }
 
 // ngx_oauth2_cfg_set_token_verify
-OAUTH2_NGINX_CFG_FUNC_START(ngx_oauth2_cfg_t, dummy, oauth2_cfg, token_verify)
+OAUTH2_NGINX_CFG_FUNC_START(oauth2, ngx_oauth2_cfg_t, token_verify)
 ngx_http_compile_complex_value_t ccv;
 
 ngx_memzero(&ccv, sizeof(ngx_http_compile_complex_value_t));
@@ -207,36 +207,21 @@ oauth2_mem_free(v2);
 oauth2_mem_free(v1);
 OAUTH2_NGINX_CFG_FUNC_END(cf, rv)
 
-static const char *oauth2_cfg_set_passphrase(void *dummy,
-					      const char *passphrase)
-{
-	return oauth2_crypto_passphrase_set(NULL, passphrase);
-}
+OAUTH2_NGINX_CFG_FUNC_ARGS1(oauth2, ngx_oauth2_cfg_t, passphrase,
+			    oauth2_crypto_passphrase_set, NULL)
+OAUTH2_NGINX_CFG_FUNC_ARGS2(oauth2, ngx_oauth2_cfg_t, cache,
+			    oauth2_cfg_set_cache, NULL)
 
-OAUTH2_NGINX_CFG_FUNC_ARGS2(ngx_oauth2_cfg_t, dummy, oauth2_cfg, cache)
-OAUTH2_NGINX_CFG_FUNC_ARGS1(ngx_oauth2_cfg_t, dummy, oauth2_cfg, passphrase)
-
-#define NGINX_OAUTH2_CMD_TAKE(nargs, primitive, member)                        \
-	OAUTH2_NGINX_CMD_TAKE##nargs(oauth2_cfg, primitive, member)
-
-// clang-format off
 static ngx_command_t ngx_oauth2_commands[] = {
-	NGINX_OAUTH2_CMD_TAKE(1, "OAuth2CryptoPassphrase", passphrase),
-	NGINX_OAUTH2_CMD_TAKE(12, "OAuth2Cache", cache),
-	NGINX_OAUTH2_CMD_TAKE(34, "OAuth2TokenVerify", token_verify),
-	{
-		ngx_string("OAuth2Claim"),
-		NGX_HTTP_LOC_CONF | NGX_CONF_TAKE2,
-		ngx_oauth2_claim_command,
-		NGX_HTTP_LOC_CONF_OFFSET,
-		0,
-		NULL
-	},
-
-	ngx_null_command
-};
+    OAUTH2_NGINX_CMD(1, oauth2, "OAuth2CryptoPassphrase", passphrase),
+    OAUTH2_NGINX_CMD(12, oauth2, "OAuth2Cache", cache),
+    OAUTH2_NGINX_CMD(3 | NGX_CONF_TAKE4, oauth2, "OAuth2TokenVerify",
+		     token_verify),
+    OAUTH2_NGINX_CMD(2, oauth2, "OAuth2Claim", claim), ngx_null_command};
 
 static ngx_int_t ngx_oauth2_post_config(ngx_conf_t *cf);
+
+// clang-format off
 
 static ngx_http_module_t ngx_oauth2_module_ctx = {
 		NULL,						/* preconfiguration              */
@@ -366,16 +351,12 @@ static ngx_int_t ngx_oauth2_handler(ngx_http_request_t *r)
 	cfg = (ngx_oauth2_cfg_t *)ngx_http_get_module_loc_conf(
 	    r, ngx_oauth2_module);
 	if (cfg == NULL) {
-		oauth2_warn(ctx->log,
-			    "ngx_http_get_module_loc_conf returned NULL");
 		rv = NGX_ERROR;
 		goto end;
 	}
 
 	ctx = oauth2_nginx_request_context_init(r);
 	if (ctx == NULL) {
-		oauth2_warn(ctx->log,
-			    "oauth2_nginx_request_context_init returned NULL");
 		rv = NGX_ERROR;
 		goto end;
 	}
