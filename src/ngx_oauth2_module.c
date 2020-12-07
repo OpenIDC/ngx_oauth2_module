@@ -399,6 +399,7 @@ static ngx_int_t ngx_oauth2_handler(ngx_http_request_t *r)
 
 	ngx_set_target_variables(cfg, ctx, json_payload);
 
+	// TODO: set response, right...?
 	rv = NGX_OK;
 
 end:
