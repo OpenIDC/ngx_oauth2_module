@@ -1,3 +1,7 @@
+06/07/2021
+- depend on liboauth2 1.4.2.1 with fixed iat slack validation defaults
+- release 3.2.1
+
 06/03/2021
 - use ngx_pcalloc instead of ngx_pnalloc to align memory access
 
