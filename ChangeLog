@@ -1,3 +1,7 @@
+07/27/2022
+- depend on liboauth2 1.4.5 with multi-treading fix for "OAuth2TokenVerify jwk <key>"
+- release 3.2.3
+
 06/07/2021
 - depend on liboauth2 1.4.2.1 with fixed iat slack validation defaults
 - release 3.2.1
