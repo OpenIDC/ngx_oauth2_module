@@ -1,4 +1,4 @@
-[![Build Status](https://github.com/zmartzone/ngx_oauth2_module/actions/workflows/build.yml/badge.svg)](https://github.com/zmartzone/ngx_oauth2_module/actions/workflows/build.yml)
+[![Build Status](https://github.com/OpenIDC/ngx_oauth2_module/actions/workflows/build.yml/badge.svg)](https://github.com/OpenIDC/ngx_oauth2_module/actions/workflows/build.yml)
 
 # ngx_oauth2_module
 
@@ -95,7 +95,7 @@ OAuth2TokenVerify [ introspect | jwk_uri | metadata | jwk | plain | base64 | bas
 
 #### Community Support
 For generic questions, see the Wiki pages with Frequently Asked Questions at:  
-  [https://github.com/zmartzone/ngx_oauth2_module/wiki](https://github.com/zmartzone/ngx_oauth2_module/wiki)  
+  [https://github.com/OpenIDC/ngx_oauth2_module/wiki](https://github.com/OpenIDC/ngx_oauth2_module/wiki)  
 Any questions/issues should go to issues tracker.
 
 #### Commercial Services
