@@ -69,6 +69,9 @@ OAuth2TokenVerify [ introspect | jwk_uri | metadata | jwk | plain | base64 | bas
         #
         # local validation from a provided jwk
         #
+        
+        # when using RFC 8705 OAuth 2.0 Mutual-TLS Certificate-Bound Access Tokens with liboauth2 >= 1.6.1
+		ssl_verify_client optional_no_ca;
 
         location /oauth2/pingfed/jwk {
 			OAuth2TokenVerify $source_token jwk 
@@ -77,7 +80,7 @@ OAuth2TokenVerify [ introspect | jwk_uri | metadata | jwk | plain | base64 | bas
 					\"use\":\"sig\",
 					\"n\":\"12SBWV_4xU8sBEC2IXcakiDe3IrrUcnIHexfyHG11Kw-EsrZvOy6PrrcqfTr1GcecyWFzQvUr61DWESrZWq96vd08_iTIWIny8pU5dlCoC7FsHU_onUQI1m4gQ3jNr00KhH878vrBVdr_T-zuOYQQOBRMEyFG-I4nb91zO1n2gcpQHeabJw3JIC9g65FCpu8DSw8uXQ1hVfGUDZAK6iwncNZ1uqN4HhRGNevFXT7KVG0cNS8S3oF4AhHafFurheVxh714R2EseTVD_FfLn2QTlCss_73YIJjzn047yKmAx5a9zuun6FKiISnMupGnHShwVoaS695rDmFvj7mvDppMQ\",
 					\"e\":\"AQAB\"
-				}";
+				}" type=mtls&mtls.policy=optional;
 
             OAuth2Claim sub $pfc_jwk_sub;
             OAuth2Claim username $pfc_jwk_username;
