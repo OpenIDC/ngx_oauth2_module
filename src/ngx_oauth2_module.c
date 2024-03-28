@@ -474,7 +474,7 @@ ngx_oauth2_check_requirements(ngx_http_request_t *r,
 
 	for (unsigned int i = 0; i < cfg->requirements->nelts; ++i) {
 		ngx_int_t var =
-			*(ngx_int_t *)cfg->requirements->elts + i;
+			*((ngx_int_t *)cfg->requirements->elts + i);
 		int rc = ngx_oauth2_check_requirement(r, ctx, var);
 		if (NGX_OK != rc) {
 			return rc;
