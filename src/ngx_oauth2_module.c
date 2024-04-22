@@ -192,7 +192,7 @@ static char *ngx_oauth2_set_claim(ngx_conf_t *cf, ngx_command_t *cmd,
 	value[2].len--;
 	value[2].data++;
 
-	v = ngx_http_add_variable(cf, &value[2], 0);
+	v = ngx_http_add_variable(cf, &value[2], NGX_HTTP_VAR_CHANGEABLE);
 	if (v == NULL) {
 		// avoid rv = "...", as it would be an implicit cast
 		// from const char * to char *
@@ -215,7 +215,6 @@ static char *ngx_oauth2_set_claim(ngx_conf_t *cf, ngx_command_t *cmd,
 	rv = NGX_CONF_OK;
 
 end:
-
 	return rv;
 }
 
