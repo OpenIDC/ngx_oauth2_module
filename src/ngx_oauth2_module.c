@@ -301,10 +301,24 @@ static char *ngx_oauth2_set_require(ngx_conf_t *cf, ngx_command_t *cmd,
 }
 
 static ngx_command_t ngx_oauth2_commands[] = {
-    OAUTH2_NGINX_CMD(1, oauth2, "OAuth2CryptoPassphrase", passphrase),
-    OAUTH2_NGINX_CMD(12, oauth2, "OAuth2Cache", cache),
-    OAUTH2_NGINX_CMD(3 | NGX_CONF_TAKE4, oauth2, "OAuth2TokenVerify",
-		     token_verify),
+    {
+	    ngx_string("OAuth2CryptoPassphrase"),
+	    NGX_HTTP_LOC_CONF | NGX_HTTP_LIF_CONF |
+	    NGX_CONF_TAKE1,
+	    ngx_oauth2_set_passphrase, NGX_HTTP_LOC_CONF_OFFSET, 0, NULL
+    },
+    {
+	    ngx_string("OAuth2Cache"),
+	    NGX_HTTP_LOC_CONF | NGX_HTTP_LIF_CONF |
+	    NGX_CONF_TAKE12,
+	    ngx_oauth2_set_cache, NGX_HTTP_LOC_CONF_OFFSET, 0, NULL
+    },
+    {
+	    ngx_string("OAuth2TokenVerify"),
+	    NGX_HTTP_LOC_CONF | NGX_HTTP_LIF_CONF |
+	    NGX_CONF_TAKE3 | NGX_CONF_TAKE4,
+	    ngx_oauth2_set_token_verify, NGX_HTTP_LOC_CONF_OFFSET, 0, NULL
+    },
     {
 	    ngx_string("OAuth2Require"),
 	    NGX_HTTP_LOC_CONF | NGX_HTTP_LIF_CONF |
@@ -312,7 +326,14 @@ static ngx_command_t ngx_oauth2_commands[] = {
 	    NGX_CONF_TAKE5 | NGX_CONF_TAKE6 | NGX_CONF_TAKE7,
 	    ngx_oauth2_set_require, NGX_HTTP_LOC_CONF_OFFSET, 0, NULL
     },
-    OAUTH2_NGINX_CMD(2, oauth2, "OAuth2Claim", claim), ngx_null_command};
+    {
+	    ngx_string("OAuth2Claim"),
+	    NGX_HTTP_LOC_CONF | NGX_HTTP_LIF_CONF |
+	    NGX_CONF_TAKE2,
+	    ngx_oauth2_set_claim, NGX_HTTP_LOC_CONF_OFFSET, 0, NULL
+    },
+    ngx_null_command
+};
 
 static ngx_int_t ngx_oauth2_post_config(ngx_conf_t *cf);
 
