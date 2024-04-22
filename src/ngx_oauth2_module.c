@@ -305,8 +305,13 @@ static ngx_command_t ngx_oauth2_commands[] = {
     OAUTH2_NGINX_CMD(12, oauth2, "OAuth2Cache", cache),
     OAUTH2_NGINX_CMD(3 | NGX_CONF_TAKE4, oauth2, "OAuth2TokenVerify",
 		     token_verify),
-    OAUTH2_NGINX_CMD(1234 | NGX_CONF_TAKE5 | NGX_CONF_TAKE6 | NGX_CONF_TAKE7,
-		     oauth2, "OAuth2Require", require),
+    {
+	    ngx_string("OAuth2Require"),
+	    NGX_HTTP_LOC_CONF | NGX_HTTP_LIF_CONF |
+	    NGX_CONF_TAKE1 | NGX_CONF_TAKE2 | NGX_CONF_TAKE3 | NGX_CONF_TAKE4 |
+	    NGX_CONF_TAKE5 | NGX_CONF_TAKE6 | NGX_CONF_TAKE7,
+	    ngx_oauth2_set_require, NGX_HTTP_LOC_CONF_OFFSET, 0, NULL
+    },
     OAUTH2_NGINX_CMD(2, oauth2, "OAuth2Claim", claim), ngx_null_command};
 
 static ngx_int_t ngx_oauth2_post_config(ngx_conf_t *cf);
