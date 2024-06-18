@@ -31,17 +31,15 @@
 #include <oauth2/oauth2.h>
 #include <oauth2/version.h>
 
-typedef struct ngx_oauth_claim_t {
-	char *name;
-	char *value;
-	struct ngx_oauth_claim_t *next;
-} ngx_oauth_claim_t;
+typedef struct ngx_oauth2_claims_hash_s {
+	ngx_hash_keys_arrays_t keys;
+	ngx_hash_t h;
+} ngx_oauth2_claims_hash_t;
 
 typedef struct ngx_oauth2_cfg_t {
 	ngx_http_complex_value_t source_token;
 	oauth2_cfg_token_verify_t *verify;
 	ngx_conf_t *cf;
-	ngx_oauth_claim_t *claims;
 	// TODO:
 	oauth2_log_t *log;
 } ngx_oauth2_cfg_t;
@@ -61,7 +59,6 @@ static void *ngx_oauth2_create_loc_conf(ngx_conf_t *cf)
 	cfg = ngx_pcalloc(cf->pool, sizeof(ngx_oauth2_cfg_t));
 	cfg->log = NULL;
 	cfg->cf = cf;
-	cfg->claims = NULL;
 	cfg->verify = NULL;
 	cfg->source_token.flushes = NULL;
 	cfg->source_token.lengths = NULL;
@@ -98,95 +95,54 @@ static char *ngx_oauth2_merge_loc_conf(ngx_conf_t *cf, void *parent,
 	return NGX_CONF_OK;
 }
 
-static ngx_int_t ngx_oauth2_claim_variable(ngx_http_request_t *r,
-					   ngx_http_variable_value_t *v,
-					   uintptr_t data)
+static inline ngx_str_t chr_to_ngx_str(ngx_pool_t *p, const char *k)
 {
-	ngx_oauth_claim_t *claim = (ngx_oauth_claim_t *)data;
+	ngx_str_t in = {strlen(k), (u_char *)k};
+	ngx_str_t out = {in.len, ngx_pstrdup(p, &in)};
+	return out;
+}
 
-	ngx_log_debug2(NGX_LOG_DEBUG_HTTP, r->connection->log, 0,
-		       "ngx_oauth2_claim_variable: %s=%s",
-		       claim && claim->name ? claim->name : "(null)",
-		       claim && claim->value ? claim->value : "(null)");
-
-	if (claim && claim->value) {
-		v->len = strlen(claim->value);
-		v->data = ngx_palloc(r->pool, v->len);
-		ngx_memcpy(v->data, claim->value, v->len);
+static inline char *ngx_str_to_chr(ngx_pool_t *p, const ngx_str_t *str)
+{
+	char *s = ngx_pnalloc(p, str->len + 1);
+	if (s) {
+		memcpy(s, str->data, str->len);
+		s[str->len] = '\0';
 	}
+	return s;
+}
 
-	if (v->len) {
-		v->valid = 1;
-		v->no_cacheable = 0;
-		v->not_found = 0;
-	} else {
-		v->not_found = 1;
-	}
-
-	return NGX_OK;
+static inline char *chr_to_chr(ngx_pool_t *p, const char *str)
+{
+	ngx_str_t s = {strlen(str), (u_char *)str};
+	return ngx_str_to_chr(p, &s);
 }
 
 static char *ngx_oauth2_set_claim(ngx_conf_t *cf, ngx_command_t *cmd,
-				  void *conf)
-{
-	char *rv = NGX_CONF_ERROR;
-	// ngx_http_core_loc_conf_t *clcf = NULL;
-	ngx_oauth2_cfg_t *cfg = (ngx_oauth2_cfg_t *)conf;
-	// ngx_http_compile_complex_value_t ccv;
-	ngx_str_t *value = NULL;
-	ngx_http_variable_t *v;
-	ngx_oauth_claim_t *claim = NULL, *ptr = NULL;
-
-	value = cf->args->elts;
-
-	claim = ngx_pcalloc(cf->pool, sizeof(ngx_oauth_claim_t));
-	claim->name = oauth2_strndup((const char *)value[1].data, value[1].len);
-	claim->value = NULL;
-
-	if (value[2].data[0] != '$') {
-		ngx_conf_log_error(NGX_LOG_EMERG, cf, 0,
-				   "invalid variable name \"%V\"", &value[2]);
-		goto end;
-	}
-
-	value[2].len--;
-	value[2].data++;
-
-	v = ngx_http_add_variable(cf, &value[2], 0);
-	if (v == NULL) {
-		rv = "ngx_http_add_variable failed";
-		goto end;
-	}
-
-	v->get_handler = ngx_oauth2_claim_variable;
-	v->data = (uintptr_t)claim;
-
-	claim->next = NULL;
-	if (cfg->claims == NULL) {
-		cfg->claims = claim;
-	} else {
-		for (ptr = cfg->claims; ptr->next; ptr = ptr->next)
-			;
-		ptr->next = claim;
-	}
-
-	rv = NGX_CONF_OK;
-
-end:
-
-	return rv;
-}
+				  void *conf);
 
 // ngx_oauth2_cfg_set_token_verify
 OAUTH2_NGINX_CFG_FUNC_START(oauth2, ngx_oauth2_cfg_t, token_verify)
+int rc = NGX_OK;
 ngx_http_compile_complex_value_t ccv;
 
 ngx_memzero(&ccv, sizeof(ngx_http_compile_complex_value_t));
 ccv.cf = cf;
 ccv.value = &value[1];
 ccv.complex_value = &cfg->source_token;
-// TODO: check return value
-ngx_http_compile_complex_value(&ccv);
+
+rc = ngx_http_compile_complex_value(&ccv);
+if (rc != NGX_OK) {
+	static const size_t MAX_BUF = 128;
+	char buf[MAX_BUF];
+	int n = snprintf(buf, sizeof(buf),
+			 "Error %d compiling "
+			 "expression %.*s",
+			 rc, (int)value[1].len, value[1].data);
+	ngx_str_t msg = {n, (u_char *)&buf[0]};
+	char *s = ngx_str_to_chr(cf->pool, &msg);
+	return s ? s : NGX_CONF_ERROR;
+}
 
 char *v1 = cf->args->nelts > 2 ? oauth2_strndup((const char *)value[2].data,
 						(size_t)value[2].len)
@@ -285,49 +241,193 @@ end:
 	return rv;
 }
 
-static void ngx_set_target_variable(ngx_oauth2_cfg_t *cfg,
-				    oauth2_nginx_request_context_t *ctx,
-				    const char *key, const char *val)
+static ngx_int_t ngx_oauth2_claim_variable(ngx_http_request_t *r,
+					   ngx_http_variable_value_t *v,
+					   uintptr_t data)
 {
-	ngx_oauth_claim_t *ptr = NULL;
-	ptr = cfg->claims;
-	while (ptr) {
-		if (strcmp(ptr->name, key) == 0)
-			break;
-		ptr = ptr->next;
+	ngx_oauth2_claims_hash_t *claims = NULL;
+	const char *value = NULL;
+
+	ngx_str_t key = {strlen((const char *)data), (u_char *)data};
+
+	claims = (ngx_oauth2_claims_hash_t *)ngx_http_get_module_ctx(
+	    r, ngx_oauth2_module);
+	if (!claims) {
+		v->not_found = 1;
+		return NGX_OK;
 	}
-	if (ptr) {
-		ptr->value = oauth2_strdup(val);
+
+	value = (const char *)ngx_hash_find(
+	    &claims->h, ngx_hash_key(key.data, key.len), key.data, key.len);
+	if (value) {
+		ngx_log_debug2(NGX_LOG_DEBUG_HTTP, r->connection->log, 0,
+			       "ngx_oauth2_claim_variable: %V=%s", &key, value);
+		v->data = (u_char *)value;
+		v->len = strlen(value);
+		v->no_cacheable = 1;
+		v->not_found = 0;
+	} else {
+		ngx_log_debug1(NGX_LOG_DEBUG_HTTP, r->connection->log, 0,
+			       "ngx_oauth2_claim_variable: %V=(null)", &key);
+		v->not_found = 1;
 	}
+
+	return NGX_OK;
+}
+
+static char *ngx_oauth2_set_claim(ngx_conf_t *cf, ngx_command_t *cmd,
+				  void *conf)
+{
+	ngx_str_t *value;
+	ngx_http_variable_t *v;
+
+	value = cf->args->elts;
+
+	if (value[2].len <= 1 || value[2].data[0] != '$') {
+		static const size_t MAX_BUF = 128;
+		char buf[MAX_BUF];
+		int n = snprintf(buf, sizeof(buf), "Invalid variable name %.*s",
+				 (int)value[2].len, value[2].data);
+		ngx_str_t msg = {n, (u_char *)&buf[0]};
+		char *s = ngx_str_to_chr(cf->pool, &msg);
+		return s ? s : NGX_CONF_ERROR;
+	}
+
+	value[2].len--;
+	value[2].data++;
+
+	v = ngx_http_add_variable(cf, &value[2], NGX_HTTP_VAR_CHANGEABLE);
+	if (!v) {
+		ngx_str_t msg = ngx_string("ngx_http_add_variable failed");
+		char *rv = ngx_str_to_chr(cf->pool, &msg);
+		return rv ? rv : NGX_CONF_ERROR;
+	}
+
+	v->get_handler = ngx_oauth2_claim_variable;
+	char *claim = ngx_str_to_chr(cf->pool, &value[1]);
+	if (!claim) {
+		ngx_str_t msg = ngx_string("Out of memory");
+		char *rv = ngx_str_to_chr(cf->pool, &msg);
+		return rv ? rv : NGX_CONF_ERROR;
+	}
+	v->data = (uintptr_t)claim;
+
+	return NGX_CONF_OK;
+}
+
+static ngx_int_t ngx_set_target_variable(ngx_oauth2_claims_hash_t *claims,
+					 oauth2_nginx_request_context_t *ctx,
+					 const char *k, const char *v)
+{
+	ngx_str_t key = chr_to_ngx_str(claims->keys.pool, k);
+	if (!key.data)
+		return NGX_ERROR;
+
+	const char *value = chr_to_chr(claims->keys.pool, v);
+	if (!value)
+		return NGX_ERROR;
+
+	return ngx_hash_add_key(&claims->keys, &key, (char *)value,
+				NGX_HASH_READONLY_KEY);
+}
+
+static ngx_int_t ngx_oauth2_init_keys(ngx_pool_t *pool,
+				      ngx_oauth2_claims_hash_t *claims)
+{
+	claims->keys.pool = pool;
+	claims->keys.temp_pool = pool;
+
+	return ngx_hash_keys_array_init(&claims->keys, NGX_HASH_SMALL);
+}
+
+static ngx_int_t ngx_oauth2_init_hash(ngx_pool_t *pool,
+				      ngx_oauth2_claims_hash_t *claims)
+{
+	ngx_hash_init_t init;
+
+	init.hash = &claims->h;
+	init.key = ngx_hash_key;
+	init.max_size = 64;
+	init.bucket_size = ngx_align(64, ngx_cacheline_size);
+	init.name = "claims";
+	init.pool = pool;
+	init.temp_pool = pool;
+
+	return ngx_hash_init(&init, claims->keys.keys.elts,
+			     claims->keys.keys.nelts);
 }
 
 // TODO: generalize/callback part of this (at least the looping and encoding is
 // generic)
-static void ngx_set_target_variables(ngx_oauth2_cfg_t *cfg,
-				     oauth2_nginx_request_context_t *ctx,
-				     json_t *json_token)
+static ngx_int_t ngx_set_target_variables(ngx_http_request_t *r,
+					  oauth2_nginx_request_context_t *ctx,
+					  json_t *json_token)
 {
 	void *iter = NULL;
 	const char *key = NULL;
 	json_t *value = NULL;
-	char *val = NULL;
+	ngx_oauth2_claims_hash_t *claims = NULL;
+	int rc = NGX_OK;
+
+	claims = (ngx_oauth2_claims_hash_t *)ngx_http_get_module_ctx(
+	    r, ngx_oauth2_module);
+	if (!claims) {
+		claims = ngx_palloc(r->pool, sizeof(*claims));
+		if (!claims) {
+			ngx_log_error(NGX_LOG_ERR, r->connection->log,
+				      NGX_ENOMEM,
+				      "ngx_set_target_variables: "
+				      "error allocating claims hash");
+			return NGX_ERROR;
+		}
+
+		rc = ngx_oauth2_init_keys(r->pool, claims);
+		if (NGX_OK != rc) {
+			ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
+				      "ngx_set_target_variables: error %d "
+				      "initializing hash keys",
+				      rc);
+			return rc;
+		}
+
+		ngx_http_set_ctx(r, claims, ngx_oauth2_module);
+	}
+
 	iter = json_object_iter(json_token);
 	while (iter) {
 		key = json_object_iter_key(iter);
 		value = json_object_iter_value(iter);
 		if (json_is_string(value)) {
-			val = oauth2_strdup(json_string_value(value));
+			rc = ngx_set_target_variable(claims, ctx, key,
+						     json_string_value(value));
 		} else {
-			val = oauth2_json_encode(ctx->log, value,
-						 JSON_ENCODE_ANY);
+			const char *val = oauth2_json_encode(ctx->log, value,
+							     JSON_ENCODE_ANY);
+			rc = ngx_set_target_variable(claims, ctx, key, val);
+			oauth2_mem_free((char *)val);
 		}
 
-		ngx_set_target_variable(cfg, ctx, key, val);
+		if (NGX_OK != rc) {
+			ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
+				      "ngx_set_target_variables: error %d "
+				      "setting value of key %s in claims hash",
+				      rc, key);
+			return rc;
+		}
 
-		if (val)
-			oauth2_mem_free(val);
 		iter = json_object_iter_next(json_token, iter);
 	}
+
+	rc = ngx_oauth2_init_hash(r->pool, claims);
+	if (NGX_OK != rc) {
+		ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
+			      "ngx_set_target_variables: error %d initializing "
+			      "claims hash",
+			      rc);
+		return rc;
+	}
+
+	return NGX_OK;
 }
 
 static ngx_int_t ngx_oauth2_handler(ngx_http_request_t *r)
@@ -340,42 +440,51 @@ static ngx_int_t ngx_oauth2_handler(ngx_http_request_t *r)
 	char *source_token = NULL;
 	json_t *json_payload = NULL;
 
-	ngx_source_token.data = NULL;
-	ngx_source_token.len = 0;
-
 	if (r != r->main)
-		goto end;
+		// do not goto end because ctx->log is not available
+		return NGX_DECLINED;
 
 	cfg = (ngx_oauth2_cfg_t *)ngx_http_get_module_loc_conf(
 	    r, ngx_oauth2_module);
 	if (cfg == NULL) {
-		rv = NGX_ERROR;
-		goto end;
+		ngx_log_error(
+		    NGX_LOG_ERR, r->connection->log, NGX_ENOMEM,
+		    "ngx_oauth2_handler: error allocating request context");
+		return NGX_ERROR;
 	}
+
+	if (cfg->verify == NULL)
+		// unhandled path: no OAuth2TokenVerify directive in this
+		// location.
+		return NGX_DECLINED;
 
 	ctx = oauth2_nginx_request_context_init(r);
 	if (ctx == NULL) {
-		rv = NGX_ERROR;
-		goto end;
+		ngx_log_error(
+		    NGX_LOG_ERR, r->connection->log, 0,
+		    "ngx_oauth2_handler: error initializing request context");
+		return NGX_ERROR;
 	}
 
 	// TODO: if we have a verify post config, call it here
 	// ...
 
-	if (ngx_http_complex_value(r, &cfg->source_token, &ngx_source_token) !=
-	    NGX_OK) {
-		oauth2_warn(
-		    ctx->log,
-		    "ngx_http_complex_value failed to obtain source_token");
+	ngx_str_null(&ngx_source_token);
+	rv = ngx_http_complex_value(r, &cfg->source_token, &ngx_source_token);
+	if (rv != NGX_OK) {
+		ngx_log_error(
+		    NGX_LOG_ERR, r->connection->log, 0,
+		    "ngx_oauth2_handler: error %d evaluating expression %*.s",
+		    rv, (int)cfg->source_token.value.len,
+		    cfg->source_token.value.data);
 		rv = NGX_ERROR;
 		goto end;
 	}
 
 	if (ngx_source_token.len == 0) {
-		oauth2_debug(ctx->log,
-			     "ngx_http_complex_value ngx_source_token.len=0");
-		// needed for non-handled paths
-		// TODO: return an error if there was any config for this path?
+		ngx_log_debug0(NGX_LOG_DEBUG_HTTP, r->connection->log, 0,
+			       "ngx_oauth2_handler: empty token");
+		rv = NGX_HTTP_UNAUTHORIZED;
 		goto end;
 	}
 
@@ -388,17 +497,13 @@ static ngx_int_t ngx_oauth2_handler(ngx_http_request_t *r)
 	if (oauth2_token_verify(ctx->log, ctx->request, cfg->verify,
 				source_token, &json_payload) == false) {
 		oauth2_warn(ctx->log, "Token could not be verified.");
-		// TODO: return HTTP 401 unauthorized
-		rv = NGX_ERROR;
+		rv = NGX_HTTP_UNAUTHORIZED;
 		goto end;
 	}
 
 	oauth2_debug(ctx->log, "json_payload=%p", json_payload);
 
-	ngx_set_target_variables(cfg, ctx, json_payload);
-
-	// TODO: set response, right...?
-	rv = NGX_OK;
+	rv = ngx_set_target_variables(r, ctx, json_payload);
 
 end:
 

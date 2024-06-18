@@ -1,5 +1,8 @@
+06/18/2024
+- fix variable colision between requests; closes #8; see #7; thanks @smanolache
+
 06/05/2024
-- depend on liboauth >= 1.6.2
+- depend on liboauth2 >= 1.6.2
 - release 3.4.0
 
 06/02/2024
