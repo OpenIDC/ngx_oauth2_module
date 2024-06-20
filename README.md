@@ -24,12 +24,16 @@ OAuth2TokenVerify [ introspect | jwk_uri | metadata | jwk | plain | base64 | bas
         "~*^Bearer\s+(?<token>[\S]+)$" $token;
     }
 
+    map $pfc_introspect_sub $valid_sub_joe {
+    	"joe"  1;
+    }
+
     server {
         listen       7070;
         server_name  nginx;
 
         #
-        # introspection
+        # introspection with a sample "require sub=joe" authorization expression
         #
 
         location /oauth2/pingfed/introspect {
@@ -40,6 +44,8 @@ OAuth2TokenVerify [ introspect | jwk_uri | metadata | jwk | plain | base64 | bas
             OAuth2Claim sub $pfc_introspect_sub;
             OAuth2Claim username $pfc_introspect_username;
             OAuth2Claim active $pfc_introspect_active;
+
+        	OAuth2Require $valid_sub_joe;            
 
             proxy_set_header OAUTH2_CLAIM_sub $pfc_introspect_sub;
             proxy_set_header OAUTH2_CLAIM_username $pfc_introspect_username;
