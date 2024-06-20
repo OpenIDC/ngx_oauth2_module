@@ -1,3 +1,7 @@
+06/20/2024
+- implement OAuth2Require with liboauth2_nginx >= 1.6.3
+- bump to 3.5.0dev
+
 06/18/2024
 - fix variable colision between requests; closes #8; see #7; thanks @smanolache
 
