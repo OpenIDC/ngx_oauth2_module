@@ -1,3 +1,6 @@
+06/24/2024
+- release 3.5.0; fixes https://github.com/OpenIDC/ngx_oauth2_module/security/advisories/GHSA-pvq3-8rvg-f36q
+
 06/20/2024
 - implement OAuth2Require with liboauth2_nginx >= 1.6.3
 - bump to 3.5.0dev
