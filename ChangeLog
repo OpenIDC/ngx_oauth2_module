@@ -1,3 +1,8 @@
+08/22/2024
+- change LICENSE to Apache 2.0
+- depend on liboauth2 >= 2.0.0
+- release 4.0.0
+
 06/24/2024
 - release 3.5.0; fixes https://github.com/OpenIDC/ngx_oauth2_module/security/advisories/GHSA-pvq3-8rvg-f36q
 
