@@ -5,22 +5,25 @@ on: [push, pull_request]
 jobs:
   build:
     runs-on: ubuntu-22.04
+    name: NGINX v${{ matrix.nginx_version }}
+
+    strategy:
+      matrix:
+        nginx_version: [1.18.0, 1.24.0, 1.26.3, 1.27.3, 1.28.0]
 
     steps:
     - uses: actions/checkout@v3
 
     - name: Dependencies
-      env:
-        NGINX_VERSION: 1.18.0
       run: |
         sudo apt-get update -y
         sudo apt-get install -y libssl-dev libcurl4-openssl-dev libhiredis-dev libmemcached-dev
         sudo apt-get install -y libjansson-dev libcjose-dev apache2-dev pkg-config
         cd /tmp        
-        wget https://nginx.org/download/nginx-${NGINX_VERSION}.tar.gz
-        tar zxvf nginx-${NGINX_VERSION}.tar.gz
-        ln -s nginx-${NGINX_VERSION} nginx
-        cd /tmp/nginx && ./configure --with-debug
+        wget https://nginx.org/download/nginx-${{ matrix.nginx_version }}.tar.gz
+        tar zxvf nginx-${{ matrix.nginx_version }}.tar.gz
+        ln -s nginx-${{ matrix.nginx_version }} nginx
+        cd /tmp/nginx && ./configure --with-debug --with-compat
         cd /tmp        
         git clone https://github.com/OpenIDC/liboauth2.git
         cd liboauth2
@@ -35,6 +38,18 @@ jobs:
 
     - name: Make
       run: make
+
+    - name: Dist
+      # Add build/{include,lib} inside <distdir> folder (eg: ngx_oauth2_module-4.0.0/) which is going to be uploaded
+      run: |
+        make distdir prefix=/build
+        make install prefix=/build DESTDIR=$(pwd)/'$(PACKAGE_NAME)-$(PACKAGE_VERSION)'
+
+    - name: Upload artifacts
+      uses: actions/upload-artifact@v4
+      with:
+        name: ngx_oauth2_module-${{ matrix.nginx_version }}
+        path: ngx_oauth2_module-*
 
     - name: Distcheck
       run: make distcheck DESTDIR="/tmp/ngx_oauth2_module" DISTCHECK_CONFIGURE_FLAGS="--with-nginx=/tmp/nginx"
